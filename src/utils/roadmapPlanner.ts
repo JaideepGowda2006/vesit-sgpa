@@ -795,3 +795,46 @@ export function applySingleCourseMinMarks(
 
   return updated;
 }
+
+/**
+ * Maps each unfilled course ID to its concrete required grade and minimum marks
+ * so each row can directly show:
+ * "🎯 Need Grade O (≥ 80/100)" or "🎯 Need Grade O (≥ 40/50)"
+ */
+export function getCourseTargetNeedsMap(
+  courses: CourseAssessment[],
+  courseResults: Map<string, CourseCalculationResult>,
+  targetSGPI: number
+): Map<string, { grade: LetterGrade; minMarks: number; totalMax: number; displayText: string }> {
+  const analysis = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
+  const plan = analysis.plans.find((p) => p.id === 'realistic') || analysis.plans[0];
+  const map = new Map<string, { grade: LetterGrade; minMarks: number; totalMax: number; displayText: string }>();
+
+  if (!plan) {
+    const fallbackGrade: LetterGrade = analysis.maxPossibleSGPI < targetSGPI ? 'O' : 'A';
+    for (const c of courses) {
+      const calc = calculateCourseResult({ ...c, isPending: false });
+      const totalMax = calc.totalMax || (c.category === 'TH' ? 100 : 50);
+      const minMarks = getMinMarksForGrade(totalMax, fallbackGrade);
+      map.set(c.id, {
+        grade: fallbackGrade,
+        minMarks,
+        totalMax,
+        displayText: `🎯 Need Grade ${fallbackGrade} (≥ ${minMarks}/${totalMax})`,
+      });
+    }
+    return map;
+  }
+
+  for (const item of plan.items) {
+    map.set(item.courseId, {
+      grade: item.targetGrade,
+      minMarks: item.minMarksNeeded,
+      totalMax: item.totalMax,
+      displayText: `🎯 Need Grade ${item.targetGrade} (≥ ${item.minMarksNeeded}/${item.totalMax})`,
+    });
+  }
+
+  return map;
+}
+

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type {
   CourseAssessment,
   CourseCalculationResult,
@@ -15,7 +15,12 @@ import {
   calculateESENeededForCourse,
   getMinMarksForGrade,
   applySingleCourseMinMarks,
+  getCourseTargetNeedsMap,
 } from '../utils/roadmapPlanner';
+import {
+  getGradeBadgeClasses,
+  getTargetNeedBadgeClasses,
+} from '../utils/gradeColors';
 
 interface CourseCardViewProps {
   courses: CourseAssessment[];
@@ -38,6 +43,11 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
   onAutofillSingleCourse,
 }) => {
   const targetGrade = analysis.recommendedLetterGrade || 'O';
+
+  // Compute concrete target requirements for each course
+  const targetNeedsMap = useMemo(() => {
+    return getCourseTargetNeedsMap(courses, courseResults, analysis.targetSGPI);
+  }, [courses, courseResults, analysis.targetSGPI]);
 
   const handleInputChange = (
     course: CourseAssessment,
@@ -75,7 +85,9 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
       onAutofillSingleCourse(course.id);
       return;
     }
-    const updated = applySingleCourseMinMarks(course, targetGrade);
+    const needInfo = targetNeedsMap.get(course.id);
+    const gradeToUse = needInfo?.grade || targetGrade;
+    const updated = applySingleCourseMinMarks(course, gradeToUse);
     onUpdateCourse(updated);
   };
 
@@ -90,10 +102,15 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
         const totalMax = result?.totalMax || (isTheory ? 100 : 50);
         const minMarksNeeded = getMinMarksForGrade(totalMax, targetGrade);
 
+        const needInfo = targetNeedsMap.get(course.id) || {
+          grade: targetGrade,
+          minMarks: minMarksNeeded,
+          totalMax,
+          displayText: `🎯 Need Grade ${targetGrade} (≥ ${minMarksNeeded}/${totalMax})`,
+        };
+
         // Component-level ESE calculation when MT or CA are entered
-        const eseAnalysis = calculateESENeededForCourse(course, targetGrade);
-        const eseAnalysisO = calculateESENeededForCourse(course, 'O');
-        const eseAnalysisA = calculateESENeededForCourse(course, 'A');
+        const eseAnalysis = calculateESENeededForCourse(course, needInfo.grade);
 
         // Failed head names list
         const failedHeadsText = result?.failedHeads
@@ -133,30 +150,38 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                     type="button"
                     onClick={() => handleQuickAutofillRow(course)}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-xs transition active:scale-95"
-                    title={`Fill minimum marks needed for Target Grade ${targetGrade}`}
+                    title={`Fill minimum marks needed for ${needInfo.grade}`}
                   >
                     <Zap className="w-3 h-3 text-yellow-300" />
-                    <span>Fill Min Marks for Target</span>
+                    <span>Fill Target</span>
                   </button>
                 )}
 
                 {hasFailedHead ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getGradeBadgeClasses('F')}`}>
                     Failed Head (F)
                   </span>
                 ) : isPending ? (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f5f5f7] dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] border border-black/[0.04] dark:border-white/[0.08]">
-                    🎯 Target: Grade {targetGrade} (Min {minMarksNeeded}/{totalMax})
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold tracking-tight border ${getTargetNeedBadgeClasses(
+                      needInfo.grade
+                    )}`}
+                  >
+                    {needInfo.displayText}
                   </span>
                 ) : (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold tracking-tight border ${getGradeBadgeClasses(
+                      result?.letterGrade || 'P'
+                    )}`}
+                  >
                     Grade {result?.letterGrade} ({result?.gradePoint} GP)
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Input Row: Clean Apple Pill Containers with Safe-Zone checks */}
+            {/* Input Row: Big, Clean, Readable Inputs */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-2.5">
               {course.isDirectOverall && course.directOverall?.enabled ? (
                 /* Overall Direct Head (e.g. MOOC / NPTEL) */
@@ -231,7 +256,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                     </div>
                   )}
 
-                  {/* ESE Theory with Concrete Goal Tag under the box */}
+                  {/* ESE Theory with Tiny Goal Tag under the box */}
                   {course.ese?.enabled && (
                     <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] flex flex-col justify-between">
                       <div className="flex items-center justify-between text-[11px] text-[#86868b] mb-1 font-medium">
@@ -255,15 +280,15 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                         <span className="text-[11px] text-[#86868b] shrink-0">/{course.ese.max}</span>
                       </div>
 
-                      {/* Concrete ESE Tag under the box */}
+                      {/* Tiny Goal Tag right under empty ESE box when MT and CA are filled */}
                       {course.ese.obtained === null && eseAnalysis && (
-                        <div className="mt-1.5 pt-1 border-t border-black/[0.04] dark:border-white/[0.06] text-[10px]">
+                        <div className="mt-1.5 pt-1 border-t border-black/[0.04] dark:border-white/[0.06] text-[11px]">
                           <div className="font-semibold text-[#0071e3] dark:text-[#2997ff] flex items-center gap-1">
-                            <Sparkles className="w-2.5 h-2.5 shrink-0" />
-                            <span>Need ≥ {eseAnalysis.neededForGrade}/{course.ese.max} in ESE for Grade {targetGrade}</span>
+                            <Sparkles className="w-3 h-3 shrink-0" />
+                            <span>Need ≥ {eseAnalysis.neededForGrade}/{course.ese.max} in End Sem</span>
                           </div>
                           {eseAnalysis.isPassingCutoffConstrained && (
-                            <span className="text-amber-600 dark:text-amber-400 font-medium block mt-0.5">
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium block mt-0.5">
                               Passing minimum is 24/60, so aim for at least 24
                             </span>
                           )}
@@ -329,29 +354,6 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
               )}
             </div>
 
-            {/* Component-Level ESE Calculation Banner (when MT & CA known) */}
-            {course.ese?.obtained === null && (eseAnalysisO || eseAnalysisA) && (
-              <div className="mb-2.5 p-2 px-3 rounded-xl bg-[#0071e3]/5 border border-[#0071e3]/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="text-[#0071e3] dark:text-[#2997ff] font-medium text-[11px] flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 shrink-0" />
-                  <span>ESE Goals (out of {course.ese?.max || 60}):</span>
-                </span>
-                <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#1d1d1f] dark:text-[#f5f5f7]">
-                  {eseAnalysisO && (
-                    <span>
-                      ≥ <strong>{eseAnalysisO.neededForGrade}</strong> for Grade O
-                    </span>
-                  )}
-                  {eseAnalysisA && (
-                    <span>
-                      • ≥ <strong>{eseAnalysisA.neededForGrade}</strong> for Grade A
-                    </span>
-                  )}
-                  <span className="text-[#86868b]">(Min Pass: {course.ese?.min || 24})</span>
-                </div>
-              </div>
-            )}
-
             {/* Bottom Row: Score summary & Aim / Action */}
             <div className="flex items-center justify-between pt-2 border-t border-black/[0.04] dark:border-white/[0.06] text-xs">
               <div className="flex items-center gap-3">
@@ -362,17 +364,17 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                   </span>
                 ) : isPending ? (
                   <span className="text-[#86868b] text-[11px]">
-                    Target: <strong className="text-[#1d1d1f] dark:text-[#f5f5f7]">Grade {targetGrade}</strong> (Min {minMarksNeeded}/{totalMax})
+                    Needs minimum <strong className="text-[#1d1d1f] dark:text-[#f5f5f7] font-mono">{needInfo.minMarks}/{needInfo.totalMax}</strong> marks
                   </span>
                 ) : (
                   <div className="flex items-center gap-2 text-[#86868b]">
                     <span>
-                      Total: <strong className="text-[#1d1d1f] dark:text-[#f5f5f7]">{result?.totalObtained}</strong> / {result?.totalMax}
+                      Total: <strong className="text-[#1d1d1f] dark:text-[#f5f5f7] font-mono">{result?.totalObtained}</strong> / {result?.totalMax}
                     </span>
                     <span>•</span>
                     <span>{result?.percentage !== null && result?.percentage !== undefined ? result.percentage.toFixed(1) : '0.0'}%</span>
                     <span>•</span>
-                    <span>C×G: <strong>{result?.cxg}</strong></span>
+                    <span>C×G: <strong className="font-mono">{result?.cxg}</strong></span>
                   </div>
                 )}
               </div>
@@ -403,4 +405,3 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
     </div>
   );
 };
-

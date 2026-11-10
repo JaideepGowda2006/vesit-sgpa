@@ -20,7 +20,12 @@ import { CourseCardView } from './CourseCardView';
 import {
   calculateESENeededForCourse,
   getMinMarksForGrade,
+  getCourseTargetNeedsMap,
 } from '../utils/roadmapPlanner';
+import {
+  getGradeBadgeClasses,
+  getTargetNeedBadgeClasses,
+} from '../utils/gradeColors';
 
 interface CoursesTableProps {
   courses: CourseAssessment[];
@@ -56,6 +61,10 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
   } | null>(null);
 
   const [tempValue, setTempValue] = useState<string>('');
+
+  const targetNeedsMap = useMemo(() => {
+    return getCourseTargetNeedsMap(courses, courseResults, analysis.targetSGPI);
+  }, [courses, courseResults, analysis.targetSGPI]);
 
   const filteredCourses = useMemo(() => {
     return courses.filter((c) => {
@@ -291,8 +300,14 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                   const hasFailedHead = res?.hasFailedHead || false;
                   const isTheory = course.category === 'TH';
                   const targetGrade = analysis.recommendedLetterGrade || 'O';
-                  const minMarksForTarget = getMinMarksForGrade(res?.totalMax || (isTheory ? 100 : 50), targetGrade);
-                  const eseHint = calculateESENeededForCourse(course, targetGrade);
+                  const totalMax = res?.totalMax || (isTheory ? 100 : 50);
+                  const needInfo = targetNeedsMap.get(course.id) || {
+                    grade: targetGrade,
+                    minMarks: getMinMarksForGrade(totalMax, targetGrade),
+                    totalMax,
+                    displayText: `🎯 Need Grade ${targetGrade}`,
+                  };
+                  const eseHint = calculateESENeededForCourse(course, needInfo.grade);
 
                   return (
                     <tr
@@ -525,18 +540,18 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                       {/* Grade */}
                       <td className="py-2 px-2 text-center">
                         {hasFailedHead ? (
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getGradeBadgeClasses('F')}`}>
                             F
                           </span>
                         ) : isPending ? (
                           <span
-                            className="px-1.5 py-0.5 rounded text-[10px] font-bold text-[#0071e3] dark:text-[#2997ff] bg-[#0071e3]/10"
-                            title={`Target: Grade ${targetGrade} (Min ${minMarksForTarget}/${res?.totalMax})`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${getTargetNeedBadgeClasses(needInfo.grade)}`}
+                            title={needInfo.displayText}
                           >
-                            Aim {targetGrade}
+                            Need {needInfo.grade}
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getGradeBadgeClasses(res?.letterGrade || 'P')}`}>
                             {res?.letterGrade}
                           </span>
                         )}
@@ -560,7 +575,7 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                               type="button"
                               onClick={() => onAutofillSingleCourse(course.id)}
                               className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#0071e3]/10 hover:bg-[#0071e3]/20 text-[#0071e3] dark:text-[#2997ff] text-[10px] font-semibold transition"
-                              title={`Fill Min Marks for Target (${minMarksForTarget}/${res?.totalMax})`}
+                              title={`Fill Min Marks for Target (${needInfo.minMarks}/${needInfo.totalMax})`}
                             >
                               <Zap className="w-2.5 h-2.5 text-yellow-500 shrink-0" />
                               <span>Fill</span>

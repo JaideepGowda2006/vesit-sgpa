@@ -11,29 +11,26 @@ import {
   SEMESTER_OPTIONS,
 } from './utils/storageManager';
 import { Header } from './components/Header';
-import { CompactKPIStrip } from './components/CompactKPIStrip';
-import { DocumentUploadSection } from './components/DocumentUploadSection';
-import { TargetPlannerKPI } from './components/TargetPlannerKPI';
+import { UnifiedTopControlBar } from './components/UnifiedTopControlBar';
 import { CoursesTable } from './components/CoursesTable';
 import { CourseRowEditModal } from './components/CourseRowEditModal';
 import { HowItWorksDrawer } from './components/HowItWorksDrawer';
 import { PrintReportModal } from './components/PrintReportModal';
 import { ImportExportModal } from './components/ImportExportModal';
-import { TargetRoadmapCard } from './components/TargetRoadmapCard';
+import { DocumentUploadSection } from './components/DocumentUploadSection';
 import {
   generateRoadmapAnalysis,
   applyRoadmapPlan,
   applySingleCourseMinMarks,
-  type RoadmapPlan,
 } from './utils/roadmapPlanner';
 import type { ParseResult } from './utils/documentMatcher';
 import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  FileSpreadsheet,
-  Target,
   UploadCloud,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 export function App() {
@@ -56,9 +53,6 @@ export function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Main navigation tab: 'marks' (default) | 'planner' | 'ocr'
-  const [activeTab, setActiveTab] = useState<'marks' | 'planner' | 'ocr'>('marks');
-
   // Active semester in isolated localStorage
   const [currentSemesterId, setCurrentSemesterId] = useState<string>('vesit_sgpa_sem4');
 
@@ -73,6 +67,9 @@ export function App() {
     return init.targetSGPI;
   });
 
+  // Optional collapsible scheme scanner
+  const [showScanner, setShowScanner] = useState(false);
+
   // Modals & drawers
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
   const [isPrintReportOpen, setIsPrintReportOpen] = useState(false);
@@ -80,7 +77,7 @@ export function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<CourseAssessment | null>(null);
 
-  // Undo history for roadmap plans
+  // Undo history for autofill actions
   const [previousCourses, setPreviousCourses] = useState<CourseAssessment[] | null>(null);
 
   // Toast notification
@@ -130,7 +127,7 @@ export function App() {
     return calculateOverallResults(courses, courseResults);
   }, [courses, courseResults]);
 
-  // 3. Dynamic reverse target GPA analysis
+  // 3. Reverse target GPA analysis
   const targetAnalysis = useMemo(() => {
     return analyzeTargetSGPI(courses, courseResults, targetSGPI);
   }, [courses, courseResults, targetSGPI]);
@@ -140,7 +137,7 @@ export function App() {
     setCourses(result.courses);
     setCurrentSemesterId('vesit_sgpa_custom');
     saveSemesterData('vesit_sgpa_custom', result.courses, targetSGPI);
-    setActiveTab('marks');
+    setShowScanner(false);
     showToast(
       `Extracted ${result.totalCourses} subjects (${result.totalCredits} Credits)`,
       'success'
@@ -186,11 +183,17 @@ export function App() {
     }
   };
 
-  // Target Roadmap: Apply concrete plan
-  const handleApplyRoadmapPlan = (plan: RoadmapPlan) => {
-    // Preserve current state for Undo
-    setPreviousCourses(JSON.parse(JSON.stringify(courses)));
+  // Big Primary Autofill: Fills missing marks to hit Target SGPA
+  const handleAutofillMissing = () => {
+    const analysis = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
+    const plan = analysis.plans.find((p) => p.id === 'realistic') || analysis.plans[0];
 
+    if (!plan) {
+      showToast('All subjects are already evaluated or target unreachable.', 'error');
+      return;
+    }
+
+    setPreviousCourses(JSON.parse(JSON.stringify(courses)));
     const updated = applyRoadmapPlan(courses, plan);
     setCourses(updated);
 
@@ -202,12 +205,12 @@ export function App() {
     });
 
     showToast(
-      `Applied ${plan.title} (Target SGPA: ${plan.achievableSGPI.toFixed(2)})`,
+      `Autofilled missing marks for Target SGPA ${targetSGPI.toFixed(2)}`,
       'success'
     );
   };
 
-  // Undo roadmap autofill action
+  // Undo autofill action
   const handleUndoRoadmap = () => {
     if (previousCourses) {
       setCourses(previousCourses);
@@ -226,11 +229,12 @@ export function App() {
     const updated = applySingleCourseMinMarks(course, targetGrade);
 
     setCourses((prev) => prev.map((c) => (c.id === courseId ? updated : c)));
-    showToast(`Filled min marks for "${course.courseName}" (Grade ${targetGrade})`, 'success');
+    showToast(`Filled marks for "${course.courseName}" (Grade ${targetGrade})`, 'success');
   };
 
-  // Set all courses to pending
-  const handleClearToPending = () => {
+  // Unmistakable Clear All Marks Button
+  const handleClearAllMarks = () => {
+    setPreviousCourses(JSON.parse(JSON.stringify(courses)));
     setCourses((prev) =>
       prev.map((c) => ({
         ...c,
@@ -243,24 +247,7 @@ export function App() {
         directOverall: c.directOverall ? { ...c.directOverall, obtained: null } : undefined,
       }))
     );
-    showToast('Reset all subjects to pending target state', 'info');
-  };
-
-  // Fill distinction marks
-  const handleFillDistinctions = () => {
-    setCourses((prev) =>
-      prev.map((c) => ({
-        ...c,
-        isPending: false,
-        midTest: c.midTest?.enabled ? { ...c.midTest, obtained: 18 } : c.midTest,
-        ca: c.ca?.enabled ? { ...c.ca, obtained: 18 } : c.ca,
-        ese: c.ese?.enabled ? { ...c.ese, obtained: c.ese.max === 100 ? 86 : 52 } : c.ese,
-        termWork: c.termWork?.enabled ? { ...c.termWork, obtained: c.termWork.max === 50 ? 44 : 22 } : c.termWork,
-        prOral: c.prOral?.enabled ? { ...c.prOral, obtained: 23 } : c.prOral,
-        directOverall: c.directOverall?.enabled ? { ...c.directOverall, obtained: 88 } : c.directOverall,
-      }))
-    );
-    showToast('Distinction marks (Grade O / ~85%) applied', 'success');
+    showToast('Cleared all marks. Ready to start fresh!', 'info');
   };
 
   // Reset current semester to defaults
@@ -324,178 +311,73 @@ export function App() {
         onToggleTheme={toggleTheme}
       />
 
-      {/* Main Workspace Container */}
+      {/* Main Workspace: ONE Simple, Unified View */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Apple Style Hero Summary */}
-        <CompactKPIStrip
-          overall={overall}
-          analysis={targetAnalysis}
+        {/* Top Control Bar: Semester, Target SGPA, Big Autofill Button, Summary Badges */}
+        <UnifiedTopControlBar
+          currentSemesterId={currentSemesterId}
+          onSelectSemester={handleSelectSemester}
           targetSGPI={targetSGPI}
-          onAutoSimulate={() => {
-            const an = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
-            if (an.plans[0]) handleApplyRoadmapPlan(an.plans[0]);
-          }}
-          onClearToPending={handleClearToPending}
-          onSwitchToPlannerTab={() => setActiveTab('planner')}
+          onTargetChange={setTargetSGPI}
+          currentSGPI={overall.currentSGPI}
+          maxPossibleSGPI={targetAnalysis.maxPossibleSGPI}
+          unfilledCredits={targetAnalysis.unfilledCredits}
+          hasAnyFailedHead={overall.hasAnyFailedCourse}
+          onAutofillMissing={handleAutofillMissing}
+          onClearAllMarks={handleClearAllMarks}
+          onUndo={handleUndoRoadmap}
+          canUndo={!!previousCourses}
         />
 
-        {/* Minimal iOS Segmented Navigation Pill */}
-        <div className="flex justify-center">
-          <div className="inline-flex p-1 rounded-full bg-black/[0.05] dark:bg-white/[0.1] backdrop-blur-xl">
-            <button
-              type="button"
-              onClick={() => setActiveTab('marks')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
-                activeTab === 'marks'
-                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
-                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
-              <span>Subjects</span>
-              <span className="text-[11px] opacity-70">({courses.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('planner')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
-                activeTab === 'planner'
-                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
-                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
-              }`}
-            >
-              <Target className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
-              <span>Target Roadmap</span>
-              {targetAnalysis.unfilledCredits > 0 && (
-                <span className="text-[10px] font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.2 rounded-full">
-                  {targetAnalysis.unfilledCredits} Cr
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('ocr')}
-              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
-                activeTab === 'ocr'
-                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
-                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
-              }`}
-            >
-              <UploadCloud className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
-              <span>Scanner</span>
-            </button>
-          </div>
+        {/* ONE Simple, Unified Subjects Table */}
+        <div className="pt-2">
+          <CoursesTable
+            courses={courses}
+            courseResults={courseResults}
+            overall={overall}
+            analysis={targetAnalysis}
+            onUpdateCourse={handleUpdateCourse}
+            onDeleteCourse={handleDeleteCourse}
+            onOpenAddModal={() => {
+              setSelectedCourseForEdit(null);
+              setIsEditModalOpen(true);
+            }}
+            onOpenEditModal={(course) => {
+              setSelectedCourseForEdit(course);
+              setIsEditModalOpen(true);
+            }}
+            onTogglePending={handleTogglePending}
+            onAutofillSingleCourse={handleAutofillSingleCourse}
+          />
         </div>
 
-        {/* Tab 1: Subjects List & Inline Edit */}
-        {activeTab === 'marks' && (
-          <div className="space-y-6">
-            {/* Target Roadmap Card (shown prominently when pending credits exist) */}
-            {targetAnalysis.unfilledCredits > 0 && (
-              <TargetRoadmapCard
-                courses={courses}
-                courseResults={courseResults}
-                targetSGPI={targetSGPI}
-                onTargetChange={setTargetSGPI}
-                onApplyPlan={handleApplyRoadmapPlan}
-                onUndo={handleUndoRoadmap}
-                canUndo={!!previousCourses}
-              />
-            )}
+        {/* Optional Collapsible Scheme Scanner (kept unobtrusive at bottom) */}
+        <div className="pt-6 border-t border-black/[0.05] dark:border-white/[0.06]">
+          <button
+            type="button"
+            onClick={() => setShowScanner(!showScanner)}
+            className="flex items-center gap-2 text-xs font-semibold text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7] transition"
+          >
+            <UploadCloud className="w-4 h-4 text-[#0071e3] dark:text-[#2997ff]" />
+            <span>Upload Custom Scheme / Screenshot from Syllabus</span>
+            {showScanner ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
 
-            <CoursesTable
-              courses={courses}
-              courseResults={courseResults}
-              overall={overall}
-              analysis={targetAnalysis}
-              onUpdateCourse={handleUpdateCourse}
-              onDeleteCourse={handleDeleteCourse}
-              onOpenAddModal={() => {
-                setSelectedCourseForEdit(null);
-                setIsEditModalOpen(true);
-              }}
-              onOpenEditModal={(course) => {
-                setSelectedCourseForEdit(course);
-                setIsEditModalOpen(true);
-              }}
-              onTogglePending={handleTogglePending}
-              onAutofillSingleCourse={handleAutofillSingleCourse}
-            />
-          </div>
-        )}
-
-        {/* Tab 2: Dedicated Reverse Target Roadmap & Solver */}
-        {activeTab === 'planner' && (
-          <div className="space-y-6">
-            <TargetPlannerKPI
-              targetSGPI={targetSGPI}
-              onTargetChange={setTargetSGPI}
-              analysis={targetAnalysis}
-              overall={overall}
-              onAutoSimulate={() => {
-                const an = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
-                if (an.plans[0]) handleApplyRoadmapPlan(an.plans[0]);
-              }}
-              onClearToPending={handleClearToPending}
-              onFillHighMarks={handleFillDistinctions}
-            />
-
-            {/* Target Roadmap Blueprint Card */}
-            <TargetRoadmapCard
-              courses={courses}
-              courseResults={courseResults}
-              targetSGPI={targetSGPI}
-              onTargetChange={setTargetSGPI}
-              onApplyPlan={handleApplyRoadmapPlan}
-              onUndo={handleUndoRoadmap}
-              canUndo={!!previousCourses}
-            />
-
-            <div className="pt-2">
-              <h3 className="text-sm font-semibold text-[#86868b] uppercase tracking-wider mb-3 px-1">
-                Subject Aim Breakdown
-              </h3>
-              <CoursesTable
-                courses={courses}
-                courseResults={courseResults}
-                overall={overall}
-                analysis={targetAnalysis}
-                onUpdateCourse={handleUpdateCourse}
-                onDeleteCourse={handleDeleteCourse}
-                onOpenAddModal={() => {
-                  setSelectedCourseForEdit(null);
-                  setIsEditModalOpen(true);
-                }}
-                onOpenEditModal={(course) => {
-                  setSelectedCourseForEdit(course);
-                  setIsEditModalOpen(true);
-                }}
-                onTogglePending={handleTogglePending}
-                onAutofillSingleCourse={handleAutofillSingleCourse}
+          {showScanner && (
+            <div className="mt-4 animate-in fade-in duration-200">
+              <DocumentUploadSection
+                onParseComplete={handleParseComplete}
+                onLoadPreset={handleSelectSemester}
+                currentSchemeName={currentSchemeName}
               />
             </div>
-          </div>
-        )}
-
-        {/* Tab 3: Scheme OCR Scanner */}
-        {activeTab === 'ocr' && (
-          <div className="space-y-6">
-            <DocumentUploadSection
-              onParseComplete={handleParseComplete}
-              onLoadPreset={handleSelectSemester}
-              currentSchemeName={currentSchemeName}
-            />
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       {/* Apple Minimalist Footer */}
       <footer className="mt-16 py-8 border-t border-black/[0.04] dark:border-white/[0.06] text-center text-xs text-[#86868b] transition-colors">
-        <p>
-          VESIT Autonomous SGPA Calculator & Target Planner
-        </p>
+        <p>VESIT Autonomous SGPA Calculator & Target Planner</p>
         <p className="mt-1 text-[11px] text-[#86868b]">
           Separate Theory (3 Cr / 100M) & Lab (1 Cr / 50M) Rows • Autonomous Mumbai University Scheme
         </p>
