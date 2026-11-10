@@ -22,7 +22,9 @@ import {
   generateRoadmapAnalysis,
   applyRoadmapPlan,
   applySingleCourseMinMarks,
+  type RoadmapPlan,
 } from './utils/roadmapPlanner';
+import { GradeBotChat } from './components/GradeBotChat';
 import type { ParseResult } from './utils/documentMatcher';
 import {
   Sparkles,
@@ -208,6 +210,22 @@ export function App() {
       `Autofilled missing marks for Target SGPA ${targetSGPI.toFixed(2)}`,
       'success'
     );
+  };
+
+  // Apply a specific roadmap plan (e.g., chosen in GradeBot chat)
+  const handleApplyRoadmapPlan = (plan: RoadmapPlan) => {
+    setPreviousCourses(JSON.parse(JSON.stringify(courses)));
+    const updated = applyRoadmapPlan(courses, plan);
+    setCourses(updated);
+
+    confetti({
+      particleCount: 50,
+      spread: 60,
+      origin: { y: 0.6 },
+      colors: ['#0071e3', '#34c759', '#5856d6'],
+    });
+
+    showToast(`Applied ${plan.title} plan!`, 'success');
   };
 
   // Undo autofill action
@@ -413,6 +431,15 @@ export function App() {
         courses={courses}
         targetSGPI={targetSGPI}
         onImportSuccess={handleImportSuccess}
+      />
+
+      {/* Zero-Dependency Local Academic Advisor Chatbot */}
+      <GradeBotChat
+        courses={courses}
+        courseResults={courseResults}
+        targetSGPI={targetSGPI}
+        overall={overall}
+        onApplyPlan={handleApplyRoadmapPlan}
       />
     </div>
   );
