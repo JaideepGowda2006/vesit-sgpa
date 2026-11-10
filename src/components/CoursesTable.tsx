@@ -17,6 +17,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { CourseCardView } from './CourseCardView';
+import {
+  calculateESENeededForCourse,
+  getMinMarksForGrade,
+} from '../utils/roadmapPlanner';
 
 interface CoursesTableProps {
   courses: CourseAssessment[];
@@ -286,6 +290,9 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                   const isPending = course.isPending || !res?.isFullyFilled;
                   const hasFailedHead = res?.hasFailedHead || false;
                   const isTheory = course.category === 'TH';
+                  const targetGrade = analysis.recommendedLetterGrade || 'O';
+                  const minMarksForTarget = getMinMarksForGrade(res?.totalMax || (isTheory ? 100 : 50), targetGrade);
+                  const eseHint = calculateESENeededForCourse(course, targetGrade);
 
                   return (
                     <tr
@@ -413,16 +420,26 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                               className="w-12 h-6 text-center text-xs font-semibold rounded bg-white dark:bg-[#2c2c2e] border border-[#0071e3] focus:outline-none"
                             />
                           ) : (
-                            <span
-                              onClick={() => startEditing(course.id, 'ese', course.ese?.obtained)}
-                              className={`cursor-pointer px-1.5 py-0.5 rounded font-mono font-medium ${
-                                course.ese.obtained !== null && course.ese.obtained < course.ese.min
-                                  ? 'text-rose-600 font-bold'
-                                  : 'text-[#1d1d1f] dark:text-[#f5f5f7]'
-                              }`}
-                            >
-                              {course.ese.obtained ?? '--'}
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span
+                                onClick={() => startEditing(course.id, 'ese', course.ese?.obtained)}
+                                className={`cursor-pointer px-1.5 py-0.5 rounded font-mono font-medium ${
+                                  course.ese.obtained !== null && course.ese.obtained < course.ese.min
+                                    ? 'text-rose-600 font-bold'
+                                    : 'text-[#1d1d1f] dark:text-[#f5f5f7]'
+                                }`}
+                              >
+                                {course.ese.obtained ?? '--'}
+                              </span>
+                              {course.ese.obtained === null && eseHint && (
+                                <span
+                                  className="text-[9px] font-semibold text-[#0071e3] dark:text-[#2997ff] tracking-tight leading-none whitespace-nowrap mt-0.5"
+                                  title={eseHint.displayText}
+                                >
+                                  ≥{eseHint.neededForGrade}
+                                </span>
+                              )}
+                            </div>
                           )
                         ) : (
                           <span className="text-[#86868b]">--</span>
@@ -512,7 +529,12 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                             F
                           </span>
                         ) : isPending ? (
-                          <span className="text-[#86868b]">--</span>
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[10px] font-bold text-[#0071e3] dark:text-[#2997ff] bg-[#0071e3]/10"
+                            title={`Target: Grade ${targetGrade} (Min ${minMarksForTarget}/${res?.totalMax})`}
+                          >
+                            Aim {targetGrade}
+                          </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40">
                             {res?.letterGrade}
@@ -537,10 +559,11 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                             <button
                               type="button"
                               onClick={() => onAutofillSingleCourse(course.id)}
-                              className="p-1 rounded text-[#0071e3] hover:bg-[#0071e3]/10 transition"
-                              title="Autofill this subject"
+                              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#0071e3]/10 hover:bg-[#0071e3]/20 text-[#0071e3] dark:text-[#2997ff] text-[10px] font-semibold transition"
+                              title={`Fill Min Marks for Target (${minMarksForTarget}/${res?.totalMax})`}
                             >
-                              <Zap className="w-3 h-3 text-yellow-500" />
+                              <Zap className="w-2.5 h-2.5 text-yellow-500 shrink-0" />
+                              <span>Fill</span>
                             </button>
                           )}
                           <button

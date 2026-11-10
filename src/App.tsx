@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import type { CourseAssessment } from './types/grading';
 import { calculateCourseResult, calculateOverallResults } from './utils/gradingEngine';
-import { analyzeTargetSGPI, getTargetMarksForCourse } from './utils/targetPlanner';
+import { analyzeTargetSGPI } from './utils/targetPlanner';
 import {
   loadSemesterData,
   saveSemesterData,
@@ -19,11 +19,13 @@ import { CourseRowEditModal } from './components/CourseRowEditModal';
 import { HowItWorksDrawer } from './components/HowItWorksDrawer';
 import { PrintReportModal } from './components/PrintReportModal';
 import { ImportExportModal } from './components/ImportExportModal';
-import { TargetTradeoffSimulator } from './components/TargetTradeoffSimulator';
+import { TargetRoadmapCard } from './components/TargetRoadmapCard';
 import {
-  generateSmartAutofillMarks,
-  type AutofillStrategy,
-} from './utils/tradeoffSimulator';
+  generateRoadmapAnalysis,
+  applyRoadmapPlan,
+  applySingleCourseMinMarks,
+  type RoadmapPlan,
+} from './utils/roadmapPlanner';
 import type { ParseResult } from './utils/documentMatcher';
 import {
   Sparkles,
@@ -32,8 +34,6 @@ import {
   FileSpreadsheet,
   Target,
   UploadCloud,
-  Zap,
-  Undo2,
 } from 'lucide-react';
 
 export function App() {
@@ -80,9 +80,8 @@ export function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<CourseAssessment | null>(null);
 
-  // Undo history & strategy for smart autofill
+  // Undo history for roadmap plans
   const [previousCourses, setPreviousCourses] = useState<CourseAssessment[] | null>(null);
-  const [autofillStrategy, setAutofillStrategy] = useState<AutofillStrategy>('balanced');
 
   // Toast notification
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(
@@ -187,17 +186,12 @@ export function App() {
     }
   };
 
-  // Reverse Target Planner: Smart Autofill with selected strategy
-  const handleSmartAutofill = (strategyToUse: AutofillStrategy = autofillStrategy) => {
+  // Target Roadmap: Apply concrete plan
+  const handleApplyRoadmapPlan = (plan: RoadmapPlan) => {
     // Preserve current state for Undo
     setPreviousCourses(JSON.parse(JSON.stringify(courses)));
 
-    const updated = generateSmartAutofillMarks(
-      courses,
-      courseResults,
-      targetSGPI,
-      strategyToUse
-    );
+    const updated = applyRoadmapPlan(courses, plan);
     setCourses(updated);
 
     confetti({
@@ -207,87 +201,32 @@ export function App() {
       colors: ['#0071e3', '#34c759', '#5856d6'],
     });
 
-    const stratName = strategyToUse === 'lab_biased' ? 'Realistic (Labs 10 GP)' : 'Balanced';
     showToast(
-      `Autofilled missing marks with ${stratName} strategy for SGPA ${targetSGPI.toFixed(2)}`,
+      `Applied ${plan.title} (Target SGPA: ${plan.achievableSGPI.toFixed(2)})`,
       'success'
     );
   };
 
-  // Undo autofill action
-  const handleUndoAutofill = () => {
+  // Undo roadmap autofill action
+  const handleUndoRoadmap = () => {
     if (previousCourses) {
       setCourses(previousCourses);
       setPreviousCourses(null);
-      showToast('Reverted autofill to previous marks', 'info');
+      showToast('Reverted marks to previous state', 'info');
     }
   };
 
-  // Apply simulated marks from slider simulator
-  const handleApplySimulatedMarks = (simulatedCourses: CourseAssessment[]) => {
-    setPreviousCourses(JSON.parse(JSON.stringify(courses)));
-    setCourses(simulatedCourses);
-
-    confetti({
-      particleCount: 45,
-      spread: 55,
-      origin: { y: 0.6 },
-      colors: ['#0071e3', '#34c759', '#5856d6'],
-    });
-
-    showToast('Simulated marks applied directly to subjects', 'success');
-  };
-
-  // Autofill single course
+  // Autofill single course with minimum marks for current target grade
   const handleAutofillSingleCourse = (courseId: string) => {
     setPreviousCourses(JSON.parse(JSON.stringify(courses)));
     const course = courses.find((c) => c.id === courseId);
     if (!course) return;
 
-    const targetGrade = targetAnalysis.recommendedLetterGrade;
-    const aim = getTargetMarksForCourse(course, targetGrade);
-    const updated: CourseAssessment = { ...course, isPending: false };
-
-    if (updated.isDirectOverall && updated.directOverall?.enabled) {
-      updated.directOverall = {
-        ...updated.directOverall,
-        obtained: aim.suggestedHeads.direct ?? Math.round(updated.directOverall.max * 0.8),
-      };
-    } else {
-      if (updated.midTest?.enabled && updated.midTest.obtained === null) {
-        updated.midTest = {
-          ...updated.midTest,
-          obtained: aim.suggestedHeads.mt ?? Math.round(updated.midTest.max * 0.8),
-        };
-      }
-      if (updated.ca?.enabled && updated.ca.obtained === null) {
-        updated.ca = {
-          ...updated.ca,
-          obtained: aim.suggestedHeads.ca ?? Math.round(updated.ca.max * 0.8),
-        };
-      }
-      if (updated.ese?.enabled && updated.ese.obtained === null) {
-        updated.ese = {
-          ...updated.ese,
-          obtained: aim.suggestedHeads.ese ?? Math.round(updated.ese.max * 0.8),
-        };
-      }
-      if (updated.termWork?.enabled && updated.termWork.obtained === null) {
-        updated.termWork = {
-          ...updated.termWork,
-          obtained: aim.suggestedHeads.tw ?? Math.round(updated.termWork.max * 0.85),
-        };
-      }
-      if (updated.prOral?.enabled && updated.prOral.obtained === null) {
-        updated.prOral = {
-          ...updated.prOral,
-          obtained: aim.suggestedHeads.pr ?? Math.round(updated.prOral.max * 0.85),
-        };
-      }
-    }
+    const targetGrade = targetAnalysis.recommendedLetterGrade || 'O';
+    const updated = applySingleCourseMinMarks(course, targetGrade);
 
     setCourses((prev) => prev.map((c) => (c.id === courseId ? updated : c)));
-    showToast(`Autofilled target marks for "${course.courseName}"`, 'success');
+    showToast(`Filled min marks for "${course.courseName}" (Grade ${targetGrade})`, 'success');
   };
 
   // Set all courses to pending
@@ -392,7 +331,10 @@ export function App() {
           overall={overall}
           analysis={targetAnalysis}
           targetSGPI={targetSGPI}
-          onAutoSimulate={() => handleSmartAutofill(autofillStrategy)}
+          onAutoSimulate={() => {
+            const an = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
+            if (an.plans[0]) handleApplyRoadmapPlan(an.plans[0]);
+          }}
           onClearToPending={handleClearToPending}
           onSwitchToPlannerTab={() => setActiveTab('planner')}
         />
@@ -424,7 +366,7 @@ export function App() {
               }`}
             >
               <Target className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
-              <span>Target & Simulator</span>
+              <span>Target Roadmap</span>
               {targetAnalysis.unfilledCredits > 0 && (
                 <span className="text-[10px] font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.2 rounded-full">
                   {targetAnalysis.unfilledCredits} Cr
@@ -449,79 +391,18 @@ export function App() {
 
         {/* Tab 1: Subjects List & Inline Edit */}
         {activeTab === 'marks' && (
-          <div className="space-y-4">
-            {/* Quick Smart Autofill Strip when unfilled subjects exist */}
+          <div className="space-y-6">
+            {/* Target Roadmap Card (shown prominently when pending credits exist) */}
             {targetAnalysis.unfilledCredits > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-4 sm:py-3 rounded-2xl bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] shadow-sm">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#0071e3]/10 dark:bg-[#2997ff]/10 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4 text-[#0071e3] dark:text-[#2997ff]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-[#1d1d1f] dark:text-[#f5f5f7]">
-                        Autofill Missing Marks to Hit {targetSGPI.toFixed(2)}
-                      </span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                        {targetAnalysis.unfilledCredits} Cr Unfilled
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#86868b] truncate">
-                      Distribute required grades across remaining subjects
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
-                  {/* Strategy Selector Pill */}
-                  <div className="inline-flex p-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setAutofillStrategy('balanced')}
-                      className={`px-2.5 py-1 rounded-full font-medium transition ${
-                        autofillStrategy === 'balanced'
-                          ? 'bg-white dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-xs'
-                          : 'text-[#86868b]'
-                      }`}
-                    >
-                      Balanced
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAutofillStrategy('lab_biased')}
-                      className={`px-2.5 py-1 rounded-full font-medium transition ${
-                        autofillStrategy === 'lab_biased'
-                          ? 'bg-white dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-xs'
-                          : 'text-[#86868b]'
-                      }`}
-                      title="Set labs to 10 GP (~85% marks) and keep theory marks realistic"
-                    >
-                      Realistic (Labs 10 GP)
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSmartAutofill(autofillStrategy)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-medium shadow-sm transition active:scale-95"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-yellow-300" />
-                    <span>Autofill</span>
-                  </button>
-
-                  {previousCourses && (
-                    <button
-                      type="button"
-                      onClick={handleUndoAutofill}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/[0.04] hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12] text-xs font-medium text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7] transition"
-                      title="Undo last autofill"
-                    >
-                      <Undo2 className="w-3.5 h-3.5" />
-                      <span>Undo</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+              <TargetRoadmapCard
+                courses={courses}
+                courseResults={courseResults}
+                targetSGPI={targetSGPI}
+                onTargetChange={setTargetSGPI}
+                onApplyPlan={handleApplyRoadmapPlan}
+                onUndo={handleUndoRoadmap}
+                canUndo={!!previousCourses}
+              />
             )}
 
             <CoursesTable
@@ -545,7 +426,7 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 2: Dedicated Reverse Target Planner & Linked Slider Simulator */}
+        {/* Tab 2: Dedicated Reverse Target Roadmap & Solver */}
         {activeTab === 'planner' && (
           <div className="space-y-6">
             <TargetPlannerKPI
@@ -553,19 +434,22 @@ export function App() {
               onTargetChange={setTargetSGPI}
               analysis={targetAnalysis}
               overall={overall}
-              onAutoSimulate={() => handleSmartAutofill(autofillStrategy)}
+              onAutoSimulate={() => {
+                const an = generateRoadmapAnalysis(courses, courseResults, targetSGPI);
+                if (an.plans[0]) handleApplyRoadmapPlan(an.plans[0]);
+              }}
               onClearToPending={handleClearToPending}
               onFillHighMarks={handleFillDistinctions}
             />
 
-            {/* Interactive Multi-Course Target Slider Simulator */}
-            <TargetTradeoffSimulator
+            {/* Target Roadmap Blueprint Card */}
+            <TargetRoadmapCard
               courses={courses}
               courseResults={courseResults}
-              overall={overall}
               targetSGPI={targetSGPI}
-              onApplySimulatedMarks={handleApplySimulatedMarks}
-              onUndoAutofill={handleUndoAutofill}
+              onTargetChange={setTargetSGPI}
+              onApplyPlan={handleApplyRoadmapPlan}
+              onUndo={handleUndoRoadmap}
               canUndo={!!previousCourses}
             />
 

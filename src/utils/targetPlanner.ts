@@ -74,32 +74,32 @@ export function analyzeTargetSGPI(
 
   if (requiredAverageGP > 10.0) {
     status = 'unattainable';
-    statusMessage = `Unattainable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)} > 10.00). Max achievable is ${maxPossibleSGPI.toFixed(2)}.`;
+    statusMessage = `Target unreachable. Maximum possible SGPA with your current scores is ${maxPossibleSGPI.toFixed(2)}.`;
     recommendedLetterGrade = 'O';
   } else if (requiredAverageGP <= 4.0) {
     status = 'secured';
-    statusMessage = `Target Secured! (Required average point ≤ 4.00 - simple passing in remaining courses will clear your target).`;
+    statusMessage = `Target Secured! Just clear minimum passing cutoffs in remaining courses to achieve ${targetSGPI.toFixed(2)} SGPA.`;
     recommendedLetterGrade = 'P';
   } else {
     status = 'achievable';
     if (requiredAverageGP > 9.0) {
       recommendedLetterGrade = 'O';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). You need Grade O (≥80%) across remaining courses.`;
+      statusMessage = `Aim for Grade O (≥80%) across pending subjects to hit your target.`;
     } else if (requiredAverageGP > 8.0) {
       recommendedLetterGrade = 'A';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). Aim for Grade A (75%–79.99%) or higher.`;
+      statusMessage = `Aim for Grade A (≥75%) across pending subjects to hit your target.`;
     } else if (requiredAverageGP > 7.0) {
       recommendedLetterGrade = 'B';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). Aim for Grade B (70%–74.99%) or higher.`;
+      statusMessage = `Aim for Grade B (≥70%) across pending subjects to hit your target.`;
     } else if (requiredAverageGP > 6.0) {
       recommendedLetterGrade = 'C';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). Aim for Grade C (60%–69.99%) or higher.`;
+      statusMessage = `Aim for Grade C (≥60%) across pending subjects to hit your target.`;
     } else if (requiredAverageGP > 5.0) {
       recommendedLetterGrade = 'D';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). Aim for Grade D (50%–59.99%) or higher.`;
+      statusMessage = `Aim for Grade D (≥50%) across pending subjects to hit your target.`;
     } else {
       recommendedLetterGrade = 'E';
-      statusMessage = `Achievable Target (Requires average Grade Point of ${requiredAverageGP.toFixed(2)}). Aim for Grade E (45%–49.99%) or higher.`;
+      statusMessage = `Aim for Grade E (≥45%) across pending subjects to hit your target.`;
     }
   }
 
@@ -229,8 +229,8 @@ export function getAimBadgeDetails(
   if (analysis.status === 'unattainable') {
     return {
       status: 'unattainable',
-      badgeText: 'Unattainable (Requires > 10.0 GP)',
-      marksText: `Max possible is 10.0 [${Math.ceil(totalMax * 0.80)}/${totalMax}]`,
+      badgeText: `Unreachable (Max ${analysis.maxPossibleSGPI.toFixed(2)})`,
+      marksText: `Max score is ${totalMax}/${totalMax}`,
       minMarksNeeded: Math.ceil(totalMax * 0.80),
       totalMax,
     };
@@ -240,8 +240,8 @@ export function getAimBadgeDetails(
     const minPassMarks = Math.ceil(totalMax * 0.40);
     return {
       status: 'safe',
-      badgeText: 'Target Safe (Just clear passing cutoffs)',
-      marksText: `>= ${minPassMarks}/${totalMax} to clear cutoffs`,
+      badgeText: `Target Safe (Grade P)`,
+      marksText: `Min ${minPassMarks}/${totalMax} to clear cutoffs`,
       minMarksNeeded: minPassMarks,
       totalMax,
     };
@@ -258,12 +258,11 @@ export function getAimBadgeDetails(
   else minPct = 40;
 
   const minMarksNeeded = Math.ceil(totalMax * (minPct / 100));
-  const gp = Math.ceil(analysis.requiredAverageGP);
 
   return {
     status: 'target',
-    badgeText: `Aim Grade ${grade} [${gp}]`,
-    marksText: `>= ${minMarksNeeded}/${totalMax} (${minPct}%)`,
+    badgeText: `Target: Grade ${grade} (Min ${minMarksNeeded}/${totalMax})`,
+    marksText: `Min ${minMarksNeeded}/${totalMax}`,
     minMarksNeeded,
     totalMax,
   };

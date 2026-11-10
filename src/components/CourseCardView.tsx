@@ -9,9 +9,13 @@ import {
   Edit3,
   AlertCircle,
   Zap,
+  Sparkles,
 } from 'lucide-react';
-import { getAimBadgeDetails, getTargetMarksForCourse } from '../utils/targetPlanner';
-import { calculateESENeeded } from '../utils/tradeoffSimulator';
+import {
+  calculateESENeededForCourse,
+  getMinMarksForGrade,
+  applySingleCourseMinMarks,
+} from '../utils/roadmapPlanner';
 
 interface CourseCardViewProps {
   courses: CourseAssessment[];
@@ -31,9 +35,10 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
   onUpdateCourse,
   onDeleteCourse,
   onOpenEditModal,
-  onTogglePending,
   onAutofillSingleCourse,
 }) => {
+  const targetGrade = analysis.recommendedLetterGrade || 'O';
+
   const handleInputChange = (
     course: CourseAssessment,
     field: 'mt' | 'ca' | 'ese' | 'tw' | 'pr' | 'direct',
@@ -70,38 +75,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
       onAutofillSingleCourse(course.id);
       return;
     }
-
-    const aim = getTargetMarksForCourse(course, analysis.recommendedLetterGrade);
-    const updated = { ...course, isPending: false };
-
-    if (updated.isDirectOverall && updated.directOverall?.enabled) {
-      updated.directOverall = {
-        ...updated.directOverall,
-        obtained: aim.suggestedHeads.direct ?? 80,
-      };
-    } else {
-      if (updated.midTest?.enabled && updated.midTest.obtained === null) {
-        updated.midTest = { ...updated.midTest, obtained: aim.suggestedHeads.mt ?? 16 };
-      }
-      if (updated.ca?.enabled && updated.ca.obtained === null) {
-        updated.ca = { ...updated.ca, obtained: aim.suggestedHeads.ca ?? 16 };
-      }
-      if (updated.ese?.enabled && updated.ese.obtained === null) {
-        // If internals known, calculate exact needed ESE
-        const mt = updated.midTest?.obtained ?? 16;
-        const ca = updated.ca?.obtained ?? 16;
-        const totalAim = aim.totalTargetMarks;
-        const needed = Math.min(updated.ese.max, Math.max(updated.ese.min, totalAim - (mt + ca)));
-        updated.ese = { ...updated.ese, obtained: needed };
-      }
-      if (updated.termWork?.enabled && updated.termWork.obtained === null) {
-        updated.termWork = { ...updated.termWork, obtained: aim.suggestedHeads.tw ?? 21 };
-      }
-      if (updated.prOral?.enabled && updated.prOral.obtained === null) {
-        updated.prOral = { ...updated.prOral, obtained: aim.suggestedHeads.pr ?? 21 };
-      }
-    }
-
+    const updated = applySingleCourseMinMarks(course, targetGrade);
     onUpdateCourse(updated);
   };
 
@@ -109,20 +83,17 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
     <div className="space-y-3">
       {courses.map((course) => {
         const result = courseResults.get(course.id);
-        const aim = getAimBadgeDetails(course, analysis);
         const isTheory = course.category === 'TH';
         const isPending = course.isPending || !result?.isFullyFilled;
         const hasFailedHead = result?.hasFailedHead || false;
 
-        // Check if MT & CA known but ESE empty
-        const hasKnownInternals =
-          isTheory &&
-          course.midTest?.obtained !== null &&
-          course.ca?.obtained !== null &&
-          course.ese?.obtained === null;
+        const totalMax = result?.totalMax || (isTheory ? 100 : 50);
+        const minMarksNeeded = getMinMarksForGrade(totalMax, targetGrade);
 
-        const eseForGradeO = hasKnownInternals ? calculateESENeeded(course, 80) : null;
-        const eseForGradeA = hasKnownInternals ? calculateESENeeded(course, 75) : null;
+        // Component-level ESE calculation when MT or CA are entered
+        const eseAnalysis = calculateESENeededForCourse(course, targetGrade);
+        const eseAnalysisO = calculateESENeededForCourse(course, 'O');
+        const eseAnalysisA = calculateESENeededForCourse(course, 'A');
 
         // Failed head names list
         const failedHeadsText = result?.failedHeads
@@ -138,8 +109,8 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                 : 'bg-white dark:bg-[#1c1c1e] border-black/[0.06] dark:border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.02)]'
             }`}
           >
-            {/* Top Bar: Title, Subtitle, Status Grade */}
-            <div className="flex items-start justify-between gap-3 mb-3">
+            {/* Top Bar: Title, Subtitle, Status Grade & Direct 1-Click Action */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm sm:text-base font-semibold text-[#1d1d1f] dark:text-[#f5f5f7] tracking-tight leading-snug">
@@ -156,16 +127,16 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
               </div>
 
               {/* Status Grade Badge & Inline Autofill */}
-              <div className="shrink-0 flex items-center gap-1.5">
+              <div className="shrink-0 flex flex-wrap items-center gap-2">
                 {isPending && (
                   <button
                     type="button"
                     onClick={() => handleQuickAutofillRow(course)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#0071e3]/10 hover:bg-[#0071e3]/20 text-[#0071e3] dark:text-[#2997ff] transition active:scale-95"
-                    title={`Autofill this subject for Target Grade ${analysis.recommendedLetterGrade}`}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white shadow-xs transition active:scale-95"
+                    title={`Fill minimum marks needed for Target Grade ${targetGrade}`}
                   >
-                    <Zap className="w-3 h-3 text-yellow-500" />
-                    <span>Autofill</span>
+                    <Zap className="w-3 h-3 text-yellow-300" />
+                    <span>Fill Min Marks for Target</span>
                   </button>
                 )}
 
@@ -174,13 +145,9 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                     Failed Head (F)
                   </span>
                 ) : isPending ? (
-                  <button
-                    type="button"
-                    onClick={() => onTogglePending(course.id)}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#f5f5f7] dark:bg-[#2c2c2e] text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7] transition"
-                  >
-                    Pending
-                  </button>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f5f5f7] dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] border border-black/[0.04] dark:border-white/[0.08]">
+                    🎯 Target: Grade {targetGrade} (Min {minMarksNeeded}/{totalMax})
+                  </span>
                 ) : (
                   <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
                     Grade {result?.letterGrade} ({result?.gradePoint} GP)
@@ -264,7 +231,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                     </div>
                   )}
 
-                  {/* ESE Theory */}
+                  {/* ESE Theory with Concrete Goal Tag under the box */}
                   {course.ese?.enabled && (
                     <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e] flex flex-col justify-between">
                       <div className="flex items-center justify-between text-[11px] text-[#86868b] mb-1 font-medium">
@@ -287,6 +254,21 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                         />
                         <span className="text-[11px] text-[#86868b] shrink-0">/{course.ese.max}</span>
                       </div>
+
+                      {/* Concrete ESE Tag under the box */}
+                      {course.ese.obtained === null && eseAnalysis && (
+                        <div className="mt-1.5 pt-1 border-t border-black/[0.04] dark:border-white/[0.06] text-[10px]">
+                          <div className="font-semibold text-[#0071e3] dark:text-[#2997ff] flex items-center gap-1">
+                            <Sparkles className="w-2.5 h-2.5 shrink-0" />
+                            <span>Need ≥ {eseAnalysis.neededForGrade}/{course.ese.max} in ESE for Grade {targetGrade}</span>
+                          </div>
+                          {eseAnalysis.isPassingCutoffConstrained && (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium block mt-0.5">
+                              Passing minimum is 24/60, so aim for at least 24
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -348,23 +330,24 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
             </div>
 
             {/* Component-Level ESE Calculation Banner (when MT & CA known) */}
-            {hasKnownInternals && (eseForGradeO !== null || eseForGradeA !== null) && (
-              <div className="mb-2.5 p-2 px-3 rounded-xl bg-[#0071e3]/5 border border-[#0071e3]/20 flex items-center justify-between text-xs">
-                <span className="text-[#0071e3] dark:text-[#2997ff] font-medium text-[11px]">
-                  🎯 ESE Breakdown (out of 60):
+            {course.ese?.obtained === null && (eseAnalysisO || eseAnalysisA) && (
+              <div className="mb-2.5 p-2 px-3 rounded-xl bg-[#0071e3]/5 border border-[#0071e3]/20 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-[#0071e3] dark:text-[#2997ff] font-medium text-[11px] flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 shrink-0" />
+                  <span>ESE Goals (out of {course.ese?.max || 60}):</span>
                 </span>
-                <div className="flex items-center gap-2 font-mono text-[11px] text-[#1d1d1f] dark:text-[#f5f5f7]">
-                  {eseForGradeO !== null && (
+                <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#1d1d1f] dark:text-[#f5f5f7]">
+                  {eseAnalysisO && (
                     <span>
-                      ≥ <strong>{eseForGradeO}</strong> for Grade O
+                      ≥ <strong>{eseAnalysisO.neededForGrade}</strong> for Grade O
                     </span>
                   )}
-                  {eseForGradeA !== null && (
+                  {eseAnalysisA && (
                     <span>
-                      • ≥ <strong>{eseForGradeA}</strong> for Grade A
+                      • ≥ <strong>{eseAnalysisA.neededForGrade}</strong> for Grade A
                     </span>
                   )}
-                  <span className="text-[#86868b]">(Min Pass: {course.ese?.min})</span>
+                  <span className="text-[#86868b]">(Min Pass: {course.ese?.min || 24})</span>
                 </div>
               </div>
             )}
@@ -379,7 +362,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                   </span>
                 ) : isPending ? (
                   <span className="text-[#86868b] text-[11px]">
-                    Target: <strong className="text-[#1d1d1f] dark:text-[#f5f5f7]">{aim.badgeText}</strong> ({aim.marksText})
+                    Target: <strong className="text-[#1d1d1f] dark:text-[#f5f5f7]">Grade {targetGrade}</strong> (Min {minMarksNeeded}/{totalMax})
                   </span>
                 ) : (
                   <div className="flex items-center gap-2 text-[#86868b]">
@@ -420,3 +403,4 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
     </div>
   );
 };
+
