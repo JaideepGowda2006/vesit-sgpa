@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 export function App() {
-  // Theme state ('dark' | 'light')
+  // Apple Theme state ('dark' | 'light')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('vesit_theme') as 'dark' | 'light') || 'dark';
   });
@@ -49,7 +49,7 @@ export function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Main navigation tab
+  // Main navigation tab: 'marks' (default) | 'planner' | 'ocr'
   const [activeTab, setActiveTab] = useState<'marks' | 'planner' | 'ocr'>('marks');
 
   // Active semester in isolated localStorage
@@ -85,10 +85,7 @@ export function App() {
 
   // Sync state whenever active semester changes
   const handleSelectSemester = (newSemesterId: string) => {
-    // Save current before switching
     saveSemesterData(currentSemesterId, courses, targetSGPI);
-
-    // Load new semester data
     const loaded = loadSemesterData(newSemesterId);
     setCurrentSemesterId(newSemesterId);
     setCourses(loaded.courses);
@@ -135,7 +132,7 @@ export function App() {
     saveSemesterData('vesit_sgpa_custom', result.courses, targetSGPI);
     setActiveTab('marks');
     showToast(
-      `Extracted & Matched ${result.totalCourses} rows (${result.totalCredits} Credits)!`,
+      `Extracted ${result.totalCourses} subjects (${result.totalCredits} Credits)`,
       'success'
     );
   };
@@ -151,7 +148,7 @@ export function App() {
   const handleDeleteCourse = (courseId: string) => {
     const courseToDelete = courses.find((c) => c.id === courseId);
     setCourses((prev) => prev.filter((c) => c.id !== courseId));
-    showToast(`Removed "${courseToDelete?.courseName || 'Course'}"`, 'info');
+    showToast(`Removed "${courseToDelete?.courseName || 'Subject'}"`, 'info');
   };
 
   // Toggle pending status
@@ -234,14 +231,14 @@ export function App() {
     );
 
     confetti({
-      particleCount: 80,
-      spread: 70,
+      particleCount: 50,
+      spread: 60,
       origin: { y: 0.6 },
-      colors: ['#6366f1', '#8b5cf6', '#10b981', '#38bdf8'],
+      colors: ['#0071e3', '#34c759', '#5856d6'],
     });
 
     showToast(
-      `Target marks calculated and distributed to hit SGPA ${targetSGPI.toFixed(2)}!`,
+      `Target marks filled to reach SGPA ${targetSGPI.toFixed(2)}`,
       'success'
     );
   };
@@ -260,7 +257,7 @@ export function App() {
         directOverall: c.directOverall ? { ...c.directOverall, obtained: null } : undefined,
       }))
     );
-    showToast('All subjects marked as pending. Reverse planner is ready!', 'info');
+    showToast('Reset all subjects to pending target state', 'info');
   };
 
   // Fill distinction marks
@@ -277,7 +274,7 @@ export function App() {
         directOverall: c.directOverall?.enabled ? { ...c.directOverall, obtained: 88 } : c.directOverall,
       }))
     );
-    showToast('Distinction marks (Grade O / ~85%) populated!', 'success');
+    showToast('Distinction marks (Grade O / ~85%) applied', 'success');
   };
 
   // Reset current semester to defaults
@@ -285,7 +282,7 @@ export function App() {
     const resetData = resetSemesterData(currentSemesterId);
     setCourses(resetData.courses);
     setTargetSGPI(resetData.targetSGPI);
-    showToast('Reset current workspace to default university scheme', 'info');
+    showToast('Workspace reset to defaults', 'info');
   };
 
   // Export JSON directly
@@ -298,7 +295,7 @@ export function App() {
     a.download = `VESIT_SGPA_${currentSemesterId}_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast('Exported workspace JSON file', 'success');
+    showToast('Downloaded JSON backup', 'success');
   };
 
   // Import JSON handler
@@ -313,22 +310,22 @@ export function App() {
     setCourses(importedCourses);
     setTargetSGPI(importedTarget);
     saveSemesterData(importedSemesterId || currentSemesterId, importedCourses, importedTarget);
-    showToast('Workspace JSON imported successfully!', 'success');
+    showToast('Workspace restored successfully', 'success');
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500/30 font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-[#f5f5f7] dark:bg-black text-[#1d1d1f] dark:text-[#f5f5f7] font-sans antialiased selection:bg-[#0071e3]/20 transition-colors duration-200">
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl text-xs font-semibold animate-in slide-in-from-bottom duration-200">
-          {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-          {toast.type === 'info' && <Sparkles className="w-4 h-4 text-indigo-500" />}
-          {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-500" />}
-          <span className="text-slate-800 dark:text-slate-200">{toast.message}</span>
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-white/95 dark:bg-[#1c1c1e]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] shadow-xl text-xs font-medium animate-in slide-in-from-bottom duration-200">
+          {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+          {toast.type === 'info' && <Sparkles className="w-4 h-4 text-[#0071e3] shrink-0" />}
+          {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />}
+          <span>{toast.message}</span>
         </div>
       )}
 
-      {/* Top Navigation & Brand Header */}
+      {/* Apple Minimalist Header */}
       <Header
         onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
         onOpenPrintReport={() => setIsPrintReportOpen(true)}
@@ -342,8 +339,8 @@ export function App() {
       />
 
       {/* Main Workspace Container */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Compact KPI Strip at the Top (Replaces giant stacked boxes) */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* Apple Style Hero Summary */}
         <CompactKPIStrip
           overall={overall}
           analysis={targetAnalysis}
@@ -353,66 +350,57 @@ export function App() {
           onSwitchToPlannerTab={() => setActiveTab('planner')}
         />
 
-        {/* Decluttered Segmented Tabs for Mobile & Desktop */}
-        <div className="mb-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 gap-2 overflow-x-auto">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Tab 1: Marks Sheet */}
+        {/* Minimal iOS Segmented Navigation Pill */}
+        <div className="flex justify-center">
+          <div className="inline-flex p-1 rounded-full bg-black/[0.05] dark:bg-white/[0.1] backdrop-blur-xl">
             <button
               type="button"
               onClick={() => setActiveTab('marks')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'marks'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-800'
+                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
+                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Marks & Grades</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/20 dark:bg-indigo-950 text-indigo-100 font-mono">
-                {courses.length}
-              </span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+              <span>Subjects</span>
+              <span className="text-[11px] opacity-70">({courses.length})</span>
             </button>
 
-            {/* Tab 2: Target Planner */}
             <button
               type="button"
               onClick={() => setActiveTab('planner')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'planner'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-800'
+                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
+                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
               }`}
             >
-              <Target className="w-4 h-4" />
-              <span>Target Planner</span>
+              <Target className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+              <span>Target</span>
               {targetAnalysis.unfilledCredits > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-500 font-mono">
-                  {targetAnalysis.unfilledCredits} Cr left
+                <span className="text-[10px] font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.2 rounded-full">
+                  {targetAnalysis.unfilledCredits} Cr
                 </span>
               )}
             </button>
 
-            {/* Tab 3: Scheme OCR Scanner */}
             <button
               type="button"
               onClick={() => setActiveTab('ocr')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'ocr'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-800'
+                  ? 'bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
+                  : 'text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7]'
               }`}
             >
-              <UploadCloud className="w-4 h-4" />
-              <span>Scan Scheme</span>
+              <UploadCloud className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+              <span>Scanner</span>
             </button>
           </div>
-
-          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium shrink-0 hidden md:inline">
-            Active: <strong className="text-slate-700 dark:text-slate-300">{currentSchemeName}</strong>
-          </span>
         </div>
 
-        {/* Tab 1 Content: Course Assessment Marks & Breakdown */}
+        {/* Tab 1: Subjects List & Inline Edit */}
         {activeTab === 'marks' && (
           <div className="space-y-4">
             <CoursesTable
@@ -435,9 +423,9 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 2 Content: Dedicated Reverse Target GPA Planner & Goal Solver */}
+        {/* Tab 2: Dedicated Reverse Target Planner */}
         {activeTab === 'planner' && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <TargetPlannerKPI
               targetSGPI={targetSGPI}
               onTargetChange={setTargetSGPI}
@@ -448,69 +436,54 @@ export function App() {
               onFillHighMarks={handleFillDistinctions}
             />
 
-            {/* Live Courses Table with Aim Marks */}
-            <CoursesTable
-              courses={courses}
-              courseResults={courseResults}
-              overall={overall}
-              analysis={targetAnalysis}
-              onUpdateCourse={handleUpdateCourse}
-              onDeleteCourse={handleDeleteCourse}
-              onOpenAddModal={() => {
-                setSelectedCourseForEdit(null);
-                setIsEditModalOpen(true);
-              }}
-              onOpenEditModal={(course) => {
-                setSelectedCourseForEdit(course);
-                setIsEditModalOpen(true);
-              }}
-              onTogglePending={handleTogglePending}
-            />
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold text-[#86868b] uppercase tracking-wider mb-3 px-1">
+                Subject Aim Breakdown
+              </h3>
+              <CoursesTable
+                courses={courses}
+                courseResults={courseResults}
+                overall={overall}
+                analysis={targetAnalysis}
+                onUpdateCourse={handleUpdateCourse}
+                onDeleteCourse={handleDeleteCourse}
+                onOpenAddModal={() => {
+                  setSelectedCourseForEdit(null);
+                  setIsEditModalOpen(true);
+                }}
+                onOpenEditModal={(course) => {
+                  setSelectedCourseForEdit(course);
+                  setIsEditModalOpen(true);
+                }}
+                onTogglePending={handleTogglePending}
+              />
+            </div>
           </div>
         )}
 
-        {/* Tab 3 Content: Multi-Document OCR & Cross-Referencing Extraction */}
+        {/* Tab 3: Scheme OCR Scanner */}
         {activeTab === 'ocr' && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <DocumentUploadSection
               onParseComplete={handleParseComplete}
               onLoadPreset={handleSelectSemester}
               currentSchemeName={currentSchemeName}
             />
-
-            {/* Preview of current table below scanner */}
-            <CoursesTable
-              courses={courses}
-              courseResults={courseResults}
-              overall={overall}
-              analysis={targetAnalysis}
-              onUpdateCourse={handleUpdateCourse}
-              onDeleteCourse={handleDeleteCourse}
-              onOpenAddModal={() => {
-                setSelectedCourseForEdit(null);
-                setIsEditModalOpen(true);
-              }}
-              onOpenEditModal={(course) => {
-                setSelectedCourseForEdit(course);
-                setIsEditModalOpen(true);
-              }}
-              onTogglePending={handleTogglePending}
-            />
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-12 py-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 transition-colors">
+      {/* Apple Minimalist Footer */}
+      <footer className="mt-16 py-8 border-t border-black/[0.04] dark:border-white/[0.06] text-center text-xs text-[#86868b] transition-colors">
         <p>
-          VESIT Autonomous SGPA Calculator, Reverse Target Planner & Scheme Parser • Autonomous NEP Batch R-2025
+          VESIT Autonomous SGPA Calculator & Target Planner
         </p>
-        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-          Client-Side Privacy • Separate Theory (3 Cr / 100M) & Lab (1 Cr / 50M) Rows • Individual Head Minimum Passing Checks
+        <p className="mt-1 text-[11px] text-[#86868b]">
+          Separate Theory (3 Cr / 100M) & Lab (1 Cr / 50M) Rows • Autonomous Mumbai University Scheme
         </p>
       </footer>
 
-      {/* Modals & Slide-over Drawers */}
+      {/* Modals & Drawers */}
       <CourseRowEditModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}

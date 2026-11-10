@@ -71,140 +71,142 @@ export const ImportExportModal: React.FC<ImportExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border border-black/[0.08] dark:border-white/[0.12] rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950/80">
+        <div className="flex items-center justify-between p-5 border-b border-black/[0.06] dark:border-white/[0.08]">
           <div className="flex items-center gap-2">
-            <FileJson className="w-5 h-5 text-indigo-400" />
-            <h3 className="text-sm font-bold text-slate-100">
-              Workspace Backup & Portability (JSON)
+            <div className="w-8 h-8 rounded-full bg-[#f5f5f7] dark:bg-[#2c2c2e] flex items-center justify-center">
+              <FileJson className="w-4 h-4 text-[#0071e3] dark:text-[#2997ff]" />
+            </div>
+            <h3 className="text-base font-semibold tracking-tight">
+              Backup & Portability
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-full text-[#86868b] hover:text-[#1d1d1f] dark:hover:text-[#f5f5f7] hover:bg-black/[0.05] dark:hover:bg-white/[0.1] transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Controls */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('import')}
-            className={`flex-1 py-2.5 font-semibold text-center transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'import'
-                ? 'text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/10'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Import Workspace</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('export')}
-            className={`flex-1 py-2.5 font-semibold text-center transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'export'
-                ? 'text-indigo-400 border-b-2 border-indigo-500 bg-indigo-500/10'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Current Workspace</span>
-          </button>
+        {/* Tab Switcher */}
+        <div className="px-5 pt-4">
+          <div className="inline-flex w-full p-1 rounded-full bg-black/[0.05] dark:bg-white/[0.1]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('import')}
+              className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition ${
+                activeTab === 'import'
+                  ? 'bg-white dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
+                  : 'text-[#86868b]'
+              }`}
+            >
+              Import JSON
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('export')}
+              className={`flex-1 py-1.5 rounded-full text-xs font-semibold transition ${
+                activeTab === 'export'
+                  ? 'bg-white dark:bg-[#2c2c2e] text-[#1d1d1f] dark:text-[#f5f5f7] shadow-sm'
+                  : 'text-[#86868b]'
+              }`}
+            >
+              Export JSON
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="p-5 overflow-y-auto space-y-4 text-xs">
           {activeTab === 'import' ? (
             <div className="space-y-3">
-              <p className="text-slate-400">
-                Upload a previously saved <code className="text-slate-300">.json</code> workspace file or paste its raw contents below to load your exact scheme and marks.
+              <p className="text-xs text-[#86868b]">
+                Select a previously exported <code className="text-[#1d1d1f] dark:text-[#f5f5f7]">.json</code> file to restore your workspace.
               </p>
 
-              <div>
-                <label className="block p-3 border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl text-center cursor-pointer bg-slate-950/40 hover:bg-slate-800/40 transition">
-                  <input
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Upload className="w-5 h-5 text-indigo-400 mx-auto mb-1" />
-                  <span className="font-semibold text-slate-200 block text-xs">
-                    Choose JSON File
-                  </span>
-                  <span className="text-[10px] text-slate-400">or drop here</span>
-                </label>
-              </div>
+              <label className="block p-5 border-2 border-dashed border-black/[0.1] dark:border-white/[0.15] hover:border-[#0071e3] rounded-2xl text-center cursor-pointer bg-[#f5f5f7]/50 dark:bg-[#2c2c2e]/40 transition">
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Upload className="w-5 h-5 text-[#0071e3] dark:text-[#2997ff] mx-auto mb-1" />
+                <span className="font-semibold block text-xs">
+                  Choose JSON File
+                </span>
+                <span className="text-[10px] text-[#86868b]">or drag and drop</span>
+              </label>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-[#86868b] font-medium mb-1">
                   Or Paste JSON Text:
                 </label>
                 <textarea
-                  rows={6}
+                  rows={5}
                   value={jsonInput}
                   onChange={(e) => setJsonInput(e.target.value)}
-                  placeholder='{"semesterId": "vesit_sgpa_sem5", "courses": [...]}'
-                  className="w-full p-2.5 font-mono text-[11px] bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:border-indigo-500 focus:outline-none scrollbar-thin"
+                  placeholder='{"semesterId": "vesit_sgpa_sem4", ...}'
+                  className="w-full p-2.5 bg-[#f5f5f7] dark:bg-[#2c2c2e] border border-black/[0.08] dark:border-white/[0.12] rounded-xl font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-[#0071e3]"
                 />
               </div>
 
-              {statusMessage && (
-                <div
-                  className={`p-2.5 rounded-lg flex items-center gap-2 text-xs font-semibold ${
-                    statusMessage.type === 'error'
-                      ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
-                      : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                  }`}
+              {jsonInput && (
+                <button
+                  type="button"
+                  onClick={() => validateAndImport(jsonInput)}
+                  className="w-full py-2.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-sm"
                 >
-                  {statusMessage.type === 'error' ? (
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  )}
-                  <span>{statusMessage.text}</span>
-                </div>
+                  Load Pasted Data
+                </button>
               )}
-
-              <button
-                type="button"
-                onClick={() => validateAndImport(jsonInput)}
-                disabled={!jsonInput.trim()}
-                className="w-full py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition disabled:opacity-40"
-              >
-                Validate & Load into Active Workspace
-              </button>
             </div>
           ) : (
-            <div className="space-y-4 text-center py-2">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mx-auto flex items-center justify-center">
-                <Download className="w-6 h-6 text-indigo-400" />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-200 text-sm">
-                  Export Active Workspace
-                </h4>
-                <p className="text-slate-400 text-xs mt-1 max-w-sm mx-auto">
-                  Downloads all {courses.length} courses, component marks, and your Target SGPA ({targetSGPI.toFixed(2)}) as a portable JSON file.
-                </p>
-              </div>
+            <div className="space-y-4">
+              <p className="text-xs text-[#86868b]">
+                Export all your courses, entered marks, and target settings into a JSON backup file.
+              </p>
 
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-left font-mono text-[11px] text-slate-400 max-h-36 overflow-y-auto">
-                <pre>{exportWorkspaceJSON(currentSemesterId, courses, targetSGPI)}</pre>
+              <div className="p-4 rounded-2xl bg-[#f5f5f7] dark:bg-[#2c2c2e] space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#86868b]">Courses:</span>
+                  <span className="font-semibold">{courses.length} Rows</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#86868b]">Target SGPA:</span>
+                  <span className="font-semibold">{targetSGPI.toFixed(2)}</span>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={handleDownloadExport}
-                className="w-full py-2.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full text-xs font-semibold bg-[#0071e3] hover:bg-[#0077ed] text-white transition shadow-sm"
               >
-                Download JSON Backup File
+                <Download className="w-4 h-4" />
+                <span>Download Backup (.json)</span>
               </button>
+            </div>
+          )}
+
+          {/* Status Message */}
+          {statusMessage && (
+            <div
+              className={`p-3 rounded-xl flex items-center gap-2 text-xs font-medium ${
+                statusMessage.type === 'error'
+                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+                  : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+              }`}
+            >
+              {statusMessage.type === 'error' ? (
+                <AlertCircle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              )}
+              <span>{statusMessage.text}</span>
             </div>
           )}
         </div>

@@ -1,13 +1,10 @@
 import React from 'react';
 import {
-  TrendingUp,
-  Target,
-  Percent,
-  Clock,
   Zap,
-  Sparkles,
-  AlertOctagon,
-  CheckCircle,
+  Target,
+  ArrowRight,
+  ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import type { OverallCalculationResult, TargetPlannerAnalysis } from '../types/grading';
 
@@ -27,137 +24,103 @@ export const CompactKPIStrip: React.FC<CompactKPIStripProps> = ({
   onAutoSimulate,
   onSwitchToPlannerTab,
 }) => {
+  const currentSGPA = overall.currentSGPI > 0 ? overall.currentSGPI.toFixed(2) : '--';
+
   return (
-    <div className="mb-5 p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-xl transition-colors">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Metric 1: Current SGPA */}
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-              Current SGPA
+    <div className="mb-6 rounded-3xl bg-white dark:bg-[#1c1c1e] border border-black/[0.06] dark:border-white/[0.08] p-5 sm:p-7 shadow-[0_4px_24px_rgba(0,0,0,0.02)] transition-all">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* Left: Prominent Clean SGPA */}
+        <div className="flex items-center gap-5">
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-[#86868b]">
+              Estimated SGPA
             </span>
-            <div className="flex items-baseline gap-1">
+            <div className="flex items-baseline gap-1.5">
               <span
-                className={`text-xl sm:text-2xl font-black font-mono leading-none ${
+                className={`text-4xl sm:text-5xl font-bold tracking-tight font-sans ${
                   overall.hasAnyFailedCourse
-                    ? 'text-rose-600 dark:text-rose-400'
+                    ? 'text-rose-500'
                     : overall.currentSGPI >= targetSGPI && overall.currentSGPI > 0
                     ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-slate-900 dark:text-slate-100'
+                    : 'text-[#1d1d1f] dark:text-[#f5f5f7]'
                 }`}
               >
-                {overall.currentSGPI > 0 ? overall.currentSGPI.toFixed(2) : '--'}
+                {currentSGPA}
               </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">/ 10</span>
+              <span className="text-sm font-medium text-[#86868b]">/ 10.00</span>
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block mt-0.5">
-              {overall.filledCoursesCount}/{overall.totalCoursesCount} evaluated ({analysis.currentSecuredPoints.toFixed(0)} pts)
-            </span>
           </div>
-        </div>
 
-        {/* Metric 2: Total Scored Marks % */}
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-            <Percent className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-              Marks Scored
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400 leading-none">
-                {overall.filledCoursesCount > 0 ? `${overall.overallPercentage.toFixed(1)}%` : '--'}
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block mt-0.5">
-              {overall.totalObtainedMarks} / {overall.totalMaxMarks} total marks
-            </span>
-          </div>
-        </div>
+          <div className="h-10 w-[1px] bg-black/[0.06] dark:bg-white/[0.1] hidden sm:block mx-1" />
 
-        {/* Metric 3: Target SGPA & Status */}
-        <div
-          onClick={onSwitchToPlannerTab}
-          className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 cursor-pointer hover:border-indigo-400/50 transition group"
-          title="Click to open reverse target planner"
-        >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-            <Target className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                Target SGPA
-              </span>
-              <span className="text-[9px] text-indigo-600 dark:text-indigo-400 underline font-semibold">
-                Adjust
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400 leading-none">
-                {targetSGPI.toFixed(2)}
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block mt-0.5">
-              {analysis.status === 'unattainable' ? (
-                <span className="text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-0.5">
-                  <AlertOctagon className="w-3 h-3" /> Unattainable
-                </span>
-              ) : analysis.status === 'secured' ? (
-                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
-                  <CheckCircle className="w-3 h-3" /> Target Safe
-                </span>
-              ) : (
-                <span className="text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-0.5">
-                  <Sparkles className="w-3 h-3" /> Aim Grade {analysis.recommendedLetterGrade}
-                </span>
+          {/* Key Secondary Stats in Apple Pill Row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="px-3 py-1.5 rounded-full bg-[#f5f5f7] dark:bg-[#2c2c2e] text-xs font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">
+              <span className="text-[#86868b] mr-1">Marks:</span>
+              <span className="font-semibold">{overall.totalObtainedMarks}</span>
+              <span className="text-[#86868b]"> / {overall.totalMaxMarks}</span>
+              {overall.filledCoursesCount > 0 && (
+                <span className="ml-1 text-[#86868b]">({overall.overallPercentage.toFixed(1)}%)</span>
               )}
-            </span>
+            </div>
+
+            <div className="px-3 py-1.5 rounded-full bg-[#f5f5f7] dark:bg-[#2c2c2e] text-xs font-medium text-[#1d1d1f] dark:text-[#f5f5f7]">
+              <span className="text-[#86868b] mr-1">Credits:</span>
+              <span className="font-semibold">{overall.totalEarnedCredits}</span>
+              <span className="text-[#86868b]"> / {overall.totalRegisteredCredits}</span>
+            </div>
+
+            {overall.hasAnyFailedCourse && (
+              <div className="px-3 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-1 border border-rose-200 dark:border-rose-900/50">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Failed Head Detected</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Metric 4: Remaining Credits & Quick Action */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
-                Pending Credits
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl sm:text-2xl font-black font-mono text-violet-600 dark:text-violet-400 leading-none">
-                  {analysis.unfilledCredits}
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  / {overall.totalRegisteredCredits} cr
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block mt-0.5">
-                {analysis.unfilledCredits > 0
-                  ? `Req GP: ${analysis.requiredAverageGP.toFixed(2)}/10`
-                  : 'All Evaluated'}
-              </span>
-            </div>
-          </div>
+        {/* Right: Target SGPA & Solver Action */}
+        <div className="flex items-center flex-wrap gap-2.5 pt-3 md:pt-0 border-t md:border-t-0 border-black/[0.06] dark:border-white/[0.08]">
+          <button
+            type="button"
+            onClick={onSwitchToPlannerTab}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#f5f5f7] hover:bg-[#e8e8ed] dark:bg-[#2c2c2e] dark:hover:bg-[#3a3a3c] text-xs font-medium text-[#1d1d1f] dark:text-[#f5f5f7] transition"
+          >
+            <Target className="w-3.5 h-3.5 text-[#0071e3] dark:text-[#2997ff]" />
+            <span>Target: <strong>{targetSGPI.toFixed(2)}</strong></span>
+            <ArrowRight className="w-3 h-3 text-[#86868b]" />
+          </button>
 
-          {/* Auto-Solve quick button */}
-          {analysis.unfilledCredits > 0 && (
+          {analysis.unfilledCredits > 0 ? (
             <button
               type="button"
               onClick={onAutoSimulate}
-              className="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition active:scale-95 shrink-0"
-              title="Auto-solve marks to meet Target SGPA"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-xs font-medium shadow-sm transition active:scale-95"
             >
-              <Zap className="w-4 h-4 text-yellow-300" />
+              <Zap className="w-3.5 h-3.5 text-yellow-300" />
+              <span>Auto-Fill Target</span>
             </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>All Evaluated</span>
+            </div>
           )}
         </div>
+      </div>
+
+      {/* Subtle Progress Bar */}
+      <div className="mt-4 w-full bg-[#f5f5f7] dark:bg-[#2c2c2e] h-1.5 rounded-full overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 rounded-full ${
+            overall.hasAnyFailedCourse
+              ? 'bg-rose-500'
+              : overall.currentSGPI >= targetSGPI && overall.currentSGPI > 0
+              ? 'bg-emerald-500'
+              : 'bg-[#0071e3]'
+          }`}
+          style={{ width: `${Math.max(4, Math.min(100, (overall.currentSGPI / 10) * 100))}%` }}
+        />
       </div>
     </div>
   );
