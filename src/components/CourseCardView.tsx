@@ -8,8 +8,10 @@ import {
   Trash2,
   Edit3,
   AlertCircle,
+  Zap,
 } from 'lucide-react';
-import { getAimBadgeDetails } from '../utils/targetPlanner';
+import { getAimBadgeDetails, getTargetMarksForCourse } from '../utils/targetPlanner';
+import { calculateESENeeded } from '../utils/tradeoffSimulator';
 
 interface CourseCardViewProps {
   courses: CourseAssessment[];
@@ -19,6 +21,7 @@ interface CourseCardViewProps {
   onDeleteCourse: (courseId: string) => void;
   onOpenEditModal: (course: CourseAssessment) => void;
   onTogglePending: (courseId: string) => void;
+  onAutofillSingleCourse?: (courseId: string) => void;
 }
 
 export const CourseCardView: React.FC<CourseCardViewProps> = ({
@@ -29,6 +32,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
   onDeleteCourse,
   onOpenEditModal,
   onTogglePending,
+  onAutofillSingleCourse,
 }) => {
   const handleInputChange = (
     course: CourseAssessment,
@@ -61,6 +65,46 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
     onUpdateCourse(updated);
   };
 
+  const handleQuickAutofillRow = (course: CourseAssessment) => {
+    if (onAutofillSingleCourse) {
+      onAutofillSingleCourse(course.id);
+      return;
+    }
+
+    const aim = getTargetMarksForCourse(course, analysis.recommendedLetterGrade);
+    const updated = { ...course, isPending: false };
+
+    if (updated.isDirectOverall && updated.directOverall?.enabled) {
+      updated.directOverall = {
+        ...updated.directOverall,
+        obtained: aim.suggestedHeads.direct ?? 80,
+      };
+    } else {
+      if (updated.midTest?.enabled && updated.midTest.obtained === null) {
+        updated.midTest = { ...updated.midTest, obtained: aim.suggestedHeads.mt ?? 16 };
+      }
+      if (updated.ca?.enabled && updated.ca.obtained === null) {
+        updated.ca = { ...updated.ca, obtained: aim.suggestedHeads.ca ?? 16 };
+      }
+      if (updated.ese?.enabled && updated.ese.obtained === null) {
+        // If internals known, calculate exact needed ESE
+        const mt = updated.midTest?.obtained ?? 16;
+        const ca = updated.ca?.obtained ?? 16;
+        const totalAim = aim.totalTargetMarks;
+        const needed = Math.min(updated.ese.max, Math.max(updated.ese.min, totalAim - (mt + ca)));
+        updated.ese = { ...updated.ese, obtained: needed };
+      }
+      if (updated.termWork?.enabled && updated.termWork.obtained === null) {
+        updated.termWork = { ...updated.termWork, obtained: aim.suggestedHeads.tw ?? 21 };
+      }
+      if (updated.prOral?.enabled && updated.prOral.obtained === null) {
+        updated.prOral = { ...updated.prOral, obtained: aim.suggestedHeads.pr ?? 21 };
+      }
+    }
+
+    onUpdateCourse(updated);
+  };
+
   return (
     <div className="space-y-3">
       {courses.map((course) => {
@@ -70,12 +114,27 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
         const isPending = course.isPending || !result?.isFullyFilled;
         const hasFailedHead = result?.hasFailedHead || false;
 
+        // Check if MT & CA known but ESE empty
+        const hasKnownInternals =
+          isTheory &&
+          course.midTest?.obtained !== null &&
+          course.ca?.obtained !== null &&
+          course.ese?.obtained === null;
+
+        const eseForGradeO = hasKnownInternals ? calculateESENeeded(course, 80) : null;
+        const eseForGradeA = hasKnownInternals ? calculateESENeeded(course, 75) : null;
+
+        // Failed head names list
+        const failedHeadsText = result?.failedHeads
+          ?.map((fh) => `${fh.headName} (${fh.obtained}/${fh.max} < Min ${fh.minRequired})`)
+          .join(', ');
+
         return (
           <div
             key={course.id}
             className={`rounded-2xl p-4 sm:p-5 transition-all border ${
               hasFailedHead
-                ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
+                ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50'
                 : 'bg-white dark:bg-[#1c1c1e] border-black/[0.06] dark:border-white/[0.08] shadow-[0_2px_8px_rgba(0,0,0,0.02)]'
             }`}
           >
@@ -96,8 +155,20 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                 </div>
               </div>
 
-              {/* Status Grade Badge */}
+              {/* Status Grade Badge & Inline Autofill */}
               <div className="shrink-0 flex items-center gap-1.5">
+                {isPending && (
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAutofillRow(course)}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#0071e3]/10 hover:bg-[#0071e3]/20 text-[#0071e3] dark:text-[#2997ff] transition active:scale-95"
+                    title={`Autofill this subject for Target Grade ${analysis.recommendedLetterGrade}`}
+                  >
+                    <Zap className="w-3 h-3 text-yellow-500" />
+                    <span>Autofill</span>
+                  </button>
+                )}
+
                 {hasFailedHead ? (
                   <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
                     Failed Head (F)
@@ -118,8 +189,8 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
               </div>
             </div>
 
-            {/* Input Row: Clean Apple Pill Containers */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3">
+            {/* Input Row: Clean Apple Pill Containers with Safe-Zone checks */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-2.5">
               {course.isDirectOverall && course.directOverall?.enabled ? (
                 /* Overall Direct Head (e.g. MOOC / NPTEL) */
                 <div className="col-span-2 sm:col-span-3 flex items-center justify-between p-2.5 rounded-xl bg-[#f5f5f7] dark:bg-[#2c2c2e]">
@@ -158,7 +229,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                           onChange={(e) => handleInputChange(course, 'mt', e.target.value)}
                           className={`w-full h-8 text-center text-sm font-semibold rounded-lg bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border focus:outline-none focus:ring-2 ${
                             course.midTest.obtained !== null && course.midTest.obtained < course.midTest.min
-                              ? 'border-rose-400 text-rose-600 focus:ring-rose-500'
+                              ? 'border-rose-400 bg-rose-50 text-rose-600 focus:ring-rose-500'
                               : 'border-black/[0.08] dark:border-white/[0.12] focus:ring-[#0071e3]'
                           }`}
                         />
@@ -184,7 +255,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                           onChange={(e) => handleInputChange(course, 'ca', e.target.value)}
                           className={`w-full h-8 text-center text-sm font-semibold rounded-lg bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border focus:outline-none focus:ring-2 ${
                             course.ca.obtained !== null && course.ca.obtained < course.ca.min
-                              ? 'border-rose-400 text-rose-600 focus:ring-rose-500'
+                              ? 'border-rose-400 bg-rose-50 text-rose-600 focus:ring-rose-500'
                               : 'border-black/[0.08] dark:border-white/[0.12] focus:ring-[#0071e3]'
                           }`}
                         />
@@ -210,7 +281,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                           onChange={(e) => handleInputChange(course, 'ese', e.target.value)}
                           className={`w-full h-8 text-center text-sm font-semibold rounded-lg bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border focus:outline-none focus:ring-2 ${
                             course.ese.obtained !== null && course.ese.obtained < course.ese.min
-                              ? 'border-rose-400 text-rose-600 focus:ring-rose-500'
+                              ? 'border-rose-400 bg-rose-50 text-rose-600 focus:ring-rose-500'
                               : 'border-black/[0.08] dark:border-white/[0.12] focus:ring-[#0071e3]'
                           }`}
                         />
@@ -238,7 +309,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                           onChange={(e) => handleInputChange(course, 'tw', e.target.value)}
                           className={`w-full h-8 text-center text-sm font-semibold rounded-lg bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border focus:outline-none focus:ring-2 ${
                             course.termWork.obtained !== null && course.termWork.obtained < course.termWork.min
-                              ? 'border-rose-400 text-rose-600 focus:ring-rose-500'
+                              ? 'border-rose-400 bg-rose-50 text-rose-600 focus:ring-rose-500'
                               : 'border-black/[0.08] dark:border-white/[0.12] focus:ring-[#0071e3]'
                           }`}
                         />
@@ -264,7 +335,7 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
                           onChange={(e) => handleInputChange(course, 'pr', e.target.value)}
                           className={`w-full h-8 text-center text-sm font-semibold rounded-lg bg-white dark:bg-[#1c1c1e] text-[#1d1d1f] dark:text-[#f5f5f7] border focus:outline-none focus:ring-2 ${
                             course.prOral.obtained !== null && course.prOral.obtained < course.prOral.min
-                              ? 'border-rose-400 text-rose-600 focus:ring-rose-500'
+                              ? 'border-rose-400 bg-rose-50 text-rose-600 focus:ring-rose-500'
                               : 'border-black/[0.08] dark:border-white/[0.12] focus:ring-[#0071e3]'
                           }`}
                         />
@@ -276,13 +347,35 @@ export const CourseCardView: React.FC<CourseCardViewProps> = ({
               )}
             </div>
 
+            {/* Component-Level ESE Calculation Banner (when MT & CA known) */}
+            {hasKnownInternals && (eseForGradeO !== null || eseForGradeA !== null) && (
+              <div className="mb-2.5 p-2 px-3 rounded-xl bg-[#0071e3]/5 border border-[#0071e3]/20 flex items-center justify-between text-xs">
+                <span className="text-[#0071e3] dark:text-[#2997ff] font-medium text-[11px]">
+                  🎯 ESE Breakdown (out of 60):
+                </span>
+                <div className="flex items-center gap-2 font-mono text-[11px] text-[#1d1d1f] dark:text-[#f5f5f7]">
+                  {eseForGradeO !== null && (
+                    <span>
+                      ≥ <strong>{eseForGradeO}</strong> for Grade O
+                    </span>
+                  )}
+                  {eseForGradeA !== null && (
+                    <span>
+                      • ≥ <strong>{eseForGradeA}</strong> for Grade A
+                    </span>
+                  )}
+                  <span className="text-[#86868b]">(Min Pass: {course.ese?.min})</span>
+                </div>
+              </div>
+            )}
+
             {/* Bottom Row: Score summary & Aim / Action */}
             <div className="flex items-center justify-between pt-2 border-t border-black/[0.04] dark:border-white/[0.06] text-xs">
               <div className="flex items-center gap-3">
                 {hasFailedHead ? (
                   <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1 text-[11px]">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    Failed cutoff (Retake head)
+                    Failed cutoff: {failedHeadsText}
                   </span>
                 ) : isPending ? (
                   <span className="text-[#86868b] text-[11px]">

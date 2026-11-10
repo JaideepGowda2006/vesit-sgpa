@@ -14,6 +14,7 @@ import {
   Plus,
   LayoutGrid,
   Table as TableIcon,
+  Zap,
 } from 'lucide-react';
 import { CourseCardView } from './CourseCardView';
 
@@ -27,6 +28,7 @@ interface CoursesTableProps {
   onOpenAddModal: () => void;
   onOpenEditModal: (course: CourseAssessment) => void;
   onTogglePending: (courseId: string) => void;
+  onAutofillSingleCourse?: (courseId: string) => void;
 }
 
 export const CoursesTable: React.FC<CoursesTableProps> = ({
@@ -38,6 +40,7 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
   onOpenAddModal,
   onOpenEditModal,
   onTogglePending,
+  onAutofillSingleCourse,
 }) => {
   // Default to clean Card View (minimal, mobile-first)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -250,6 +253,7 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
           onDeleteCourse={onDeleteCourse}
           onOpenEditModal={onOpenEditModal}
           onTogglePending={onTogglePending}
+          onAutofillSingleCourse={onAutofillSingleCourse}
         />
       ) : (
         /* Minimalist Spreadsheet View */
@@ -529,6 +533,16 @@ export const CoursesTable: React.FC<CoursesTableProps> = ({
                       {/* Action */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {isPending && onAutofillSingleCourse && (
+                            <button
+                              type="button"
+                              onClick={() => onAutofillSingleCourse(course.id)}
+                              className="p-1 rounded text-[#0071e3] hover:bg-[#0071e3]/10 transition"
+                              title="Autofill this subject"
+                            >
+                              <Zap className="w-3 h-3 text-yellow-500" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onOpenEditModal(course)}
